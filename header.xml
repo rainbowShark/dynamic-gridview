@@ -1,0 +1,1294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet href="/css/base.css" type="text/css"?>
+<?xml-stylesheet href="/css/style.css" type="text/css"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head>
+    	<w2:buildDate />
+    	<xf:model>
+    		<xf:instance>
+    			<data xmlns="" />
+    		</xf:instance>
+			<w2:dataCollection></w2:dataCollection>
+    	</xf:model>
+
+		<script language="javascript" src="/js/Cti.js"></script>  	
+    	
+    	<script type="javascript"><![CDATA[
+	
+			/*
+				업 무 명: Header
+				작 성 자: LHC
+				작성일자: 2014-05-28
+				기능설명: 기본 Layout Header
+	        */
+
+	        //=============================================================================
+	        // 1. 페이지 전역 변수 선언 및 할당
+	        //=============================================================================
+			var gv_systemPath	= SYS_COMMON;		//RequestMapping 경로
+			var gv_sysType 		= "0";						//현재 보여지는 시스템구분 
+			var gv_showGB		= "";						//출/퇴근 처리 Flag  
+			var trblPoCnt 		= 0;
+	
+	        //=============================================================================
+	        // 2. 페이지 이벤트 헨들러
+	        //============================================================================= 
+			function fncOnLoad(){
+				try {
+					//cm_pageInitialize();		//[필수] 모든 화면 공통 호출 JS
+					fncSetCommonCode();	//[공통] 기본 공통코드 설정
+					fncSetDefaultValue();	//[공통] 기본 Default 설정
+	            } catch (e) {
+					alert("fncOnLoad(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}	 
+			}
+
+			
+	        //=============================================================================
+	        // 3. Load 후 초기설정 및 데이터 설정
+	        //=============================================================================
+	        function fncSetCommonCode() {
+	            try {
+	            
+					/*
+					* 공통코드 Combo
+					* ex : 	cm_setCommonCode (공통쿼리ID, 조건배열, 셋팅할 ID, code/value표시여부, displayYn, callback함수)
+					*/
+					//var codeType = "sysTypeByRole";
+					//cm_setCommonCode(codeType, [SS_roleId], codeType, false, false, fncEndCommonCode);		//권한ID에 해당하는 시스템 구분
+					cm_setCommonCodeSync("sysTypeByUser", [SS_userId], "sysTypeByUser", false, false);			//사용자별 시스템구분 조회
+					cm_setCommonCodeSync("commonByLargeAll", [0028], readN, false, false);							//퀵메뉴 용 
+					
+					/* 1. 시스템구분 으로 Image View 여부 체크 */
+					var opYn	= "N";		//운영 View 여부
+					var inYn		= "N";		//정보 View 여부
+					var mnYn	= "N";		//관리 View 여부
+					var sysType = "";		//시스템구분 우선순위 (0:운영, 1:정보, 2:관리)
+					
+					var dataLength = dlt_sysTypeByUser.getRowCount();  	//사용자별 시스템구분 조회 
+
+					if ( dataLength > 0 ){
+						opYn = dlt_sysTypeByUser.getCellData(0, "content1");
+						inYn = dlt_sysTypeByUser.getCellData(0, "content2");
+						mnYn = dlt_sysTypeByUser.getCellData(0, "content3");
+						sysType = dlt_sysTypeByUser.getCellData(0, "content4");
+
+						//운영 View
+						if ( opYn == "Y" ){
+							hd_group16.show("");
+							if ( sysType == null || sysType == "" ){
+								sysType = "0";
+							} 						
+						}
+						
+						//정보 View
+						if ( inYn == "Y" ){
+							hd_group17.show("");
+							if ( sysType == null || sysType == "" ){
+								sysType = "1";
+							} 						
+						}						
+
+						//관리 View
+						if ( mnYn == "Y" ){
+							hd_group18.show("");
+							if ( sysType == null || sysType == "" ){
+								sysType = "2";
+							} 
+						}
+				
+						fncChangeSysType(sysType);		//업무변경 
+					}					
+						
+	            } catch (e) {
+					alert("fncSetCommonCode(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+	        }
+	        	        
+	        function fncSetDefaultValue() {
+	            try {
+					//로그인 정보 표시 
+					var label = SS_userName + " 님";			//홍길동 (1234567) 님
+					btn_arrow.setValue( label );
+	            	
+	            	//메인 공지사항 띄우기 ==> 메인 공지사항은 창닫기 안되도록 처리 요청 (2014.09.03 한기성대표)
+	            	//fncClickMenu( gv_systemPath+"/mainNotice.do" ,"Notice, News", "NOTICE", "selectWindow" );
+	            	
+					var windowName2 = "<font color=\"red\">test</font>";			//엔진 업데이트 이후 태그 가능 여부 체크해야함...(2014.10.24)	            	
+	            	
+	            	win_main.createWindow( "Notice, News" , null , "/nibs.jsp?w2xPath="+gv_systemPath+"/mainNotice.do" , null , "NOTICE", "existWindow", "fncMainColse" );
+					win_main.setStyle("left", "220px");
+	            	
+	            	//퀵메뉴 영역 View 체크 ===> 퍼블리싱 & 이미지 & CTI 관련 ????????? 
+	            	if ( SS_deptCode == "20" && SS_officeCode == "10" ){
+	            		//출퇴근 퀵메뉴 View설정
+	            		fncQuickQuery();
+	            			            	
+	            		//퀵메뉴 show
+	            		hd_quick.show( "" );
+	            		
+	            		//셀렉트박스 show
+	            		readGubun.show( "" );
+	            		readN.show( "" );
+	            		readY.hide();		//default hide
+	            		
+	            		//cti 상태 표시
+	            		hd_groupp8.show( "" );
+
+	            	} else {
+	            		//퀵메뉴 hide
+	            		hd_quick.hide();
+	            		
+	            		//셀렉트박스 hide
+	            		readGubun.hide();	
+	            		readN.hide();	
+	            		readY.hide();
+	            		
+	            		//cti 상태 숨기기
+                  hd_groupp8.hide();
+                  
+	            	}
+	            	
+	            } catch (e) {
+					alert("fncSetDefaultValue(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+	        }			
+
+	        /**
+				함수명: fncMainColse
+				설  명: 메인 공지사항 닫기 시 호출
+				인  자: 
+				리  턴: boolean (닫기:true, 닫기중지:false)
+			 */
+			function fncMainColse(){
+				var closeYn = true;
+				
+				//메인 공지사항은 창닫기 안되도록 처리 요청 (2014.09.03 한기성대표)
+				closeYn = false;
+				
+				return closeYn;
+			}
+
+	        //=============================================================================
+	        // 4. 사용자 정의 함수
+	        //=============================================================================	
+
+	        /**
+				함수명: fncQuery
+				설  명: 메뉴 목록 Select (전체메뉴)
+				인  자: sysType (선택 시스템구분)
+				리  턴: 
+			 */
+			function fncQuery(sysType){
+	            try {
+	            	gv_sysType = sysType;			//현재 선택 시스템구분 셋팅 	            
+
+					var requestData = {};
+					requestData.sysType	= sysType;			//시스템 구분 
+					requestData.memberId = SS_userId;
+
+                    //권한체계 적용
+				    var action		= "selectAllMenuListNew";
+					
+					//기존메뉴
+					//var action     = "selectAllMenuList"; 
+					var callBack	= fncQuery_RESULT;
+					cm_submitAjax( gv_systemPath, action, requestData, callBack, false );	//서버 ajax 통신
+	            } catch (e) {
+					alert("fncQuery(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+			function fncQuery_RESULT(resultData){
+	            try {
+	            	//cm_logPrint("resultdata=>\n"+JSON.stringify(resultData));	//결과로그 출력
+					//console.log("resultdata=>\n"+JSON.stringify(resultData));
+	            	
+					var menuList = resultData.resultList;
+
+					for (i=0; i < menuList.length; i++) {
+						if (menuList[i].menuFlag == "1") menuList[i].menuNm = menuList[i].gMenuNm;
+						if (menuList[i].menuFlag == "2") menuList[i].menuNm = menuList[i].mMenuNm;
+						if (menuList[i].menuFlag == "3") menuList[i].menuNm = menuList[i].programNm;
+
+						var gMenuId =  menuList[i].gMenuId || "00";
+						var mMenuId =  menuList[i].mMenuId || "00";
+						var programId =  menuList[i].programId || "00";
+
+						menuList[i].menuId =gMenuId + mMenuId + programId;
+					}
+
+                    //side.xml dlt_menu
+					$p.main().se_wframe.getWindow().dlt_menu.setJSON(menuList);
+
+					//결과정보 Instance 영역에 셋팅 
+					var srcNode = WebSquare.xml.findNode(WebSquare.json.JSON2XML(resultData), "object/resultList");
+					WebSquare.ModelUtil.setInstanceNode( srcNode , "menu" , null , "replace" );		// menu/resultList/object....
+					
+					//메뉴 html 생성 
+					fncCreateMenuHtml();
+					
+	            } catch (e) {
+					alert("fncQuery_RESULT(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}				
+			}	
+
+	        /**
+				함수명: fncCreateMenuHtml
+				설  명: 메뉴 생성 HTML
+				인  자: 
+				리  턴: 
+			 */
+			function fncCreateMenuHtml(){
+	            try {
+	            
+	            	gen_firstGenerator.removeAll();
+	            	
+					var oldMenuFlag = "1";		//기존 메뉴구분(1:대메뉴, 2:중메뉴, 3:프로그램)
+					var gMenuCnt = 0;
+					var mMenuFlag = 0;			//대메뉴에 해당하는 중메뉴 CNT 
+
+					var nodes = WebSquare.ModelUtil.findInstanceNodes( "menu/resultList/object" );
+					
+					var tmpParentIdx = 0;
+					
+					for (var i=0; i<nodes.length; i++){
+						var menuFlag	= WebSquare.xml.getValue( nodes[i] , "menuFlag" );		//메뉴구분(1:대메뉴, 2:중메뉴, 3:프로그램)
+						var gMenuId		= WebSquare.xml.getValue( nodes[i] , "gMenuId" );		//대메뉴ID
+						var gMenuNm		= WebSquare.xml.getValue( nodes[i] , "gMenuNm" );		//대메뉴명
+						var mMenuId		= WebSquare.xml.getValue( nodes[i] , "mMenuId" );		//중메뉴ID
+						var mMenuNm		= WebSquare.xml.getValue( nodes[i] , "mMenuNm" );		//중메뉴명
+						var programId	= WebSquare.xml.getValue( nodes[i] , "programId" );		//프로그램ID
+						var programNm	= WebSquare.xml.getValue( nodes[i] , "programNm" );		//프로그램명
+						var url			= WebSquare.xml.getValue( nodes[i] , "url" );			//프로그램URL
+						var mMenuCnt	= WebSquare.xml.getValue( nodes[i] , "mMenuCnt" );		//대메뉴에 해당하는 중메뉴 CNT
+						var popYn		= WebSquare.xml.getValue( nodes[i] , "popYn" );			//프로그램 popup 여부
+						var programCd	= WebSquare.xml.getValue( nodes[i] , "programCd" );		//프로그램코드
+
+						/* 대메뉴 */
+						if ( menuFlag == "1" ) {
+	
+							tmpParentIdx = gen_firstGenerator.insertChild();
+
+							var firstMenuLabel = gen_firstGenerator.getChild(tmpParentIdx, "btn_menu1_Label");
+							
+							firstMenuLabel.setValue(gMenuNm); // headerData_obj.TRX_CD_NM
+							firstMenuLabel.setUserData("ins_webPath", url);
+							firstMenuLabel.setUserData("ins_label", gMenuNm);
+							firstMenuLabel.setUserData("ins_code", gMenuId);
+
+						}
+						
+					} //for 문 끝
+
+					// side.xml 메뉴 세팅
+					fncInitMenu();
+
+
+	            } catch (e) {
+					alert("fncCreateMenuHtml(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}					
+			}
+
+	        /**
+				함수명: fncChangeSysType
+				설  명: 업무변경 선택 시 
+				인  자: 
+				리  턴: 
+			 */
+			function fncChangeSysType(sysType){
+	            try {
+
+					// 이전 시스템의 windowContainer nameLayer 삭제;
+					win_main_closeAll.click();
+					
+					/* 2. 시스템구분 우선순위로 Image src 변경 */
+					if ( sysType == "0" ){
+						hd_image1.setSrc( "/images/logo_nibs.png");
+
+						sys_name.setValue("운영시스템");
+
+						hd_image2.setSrc( "/images/btn_sys01_on.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_off.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_off.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '10'");
+						
+					} else if ( sysType == "1" ){
+//						hd_image1.setSrc( "/images/logo_h1_02.gif");
+						hd_image1.setSrc( "/images/logo_nibs.png");
+						
+						sys_name.setValue("정보시스템");
+
+						hd_image2.setSrc( "/images/btn_sys01_off.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_on.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_off.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '35'");
+						
+					} else if ( sysType == "2" ){
+//						hd_image1.setSrc( "/images/logo_h1_03.gif");
+						hd_image1.setSrc( "/images/logo_nibs.png");
+						sys_name.setValue("관리시스템");
+						hd_image2.setSrc( "/images/btn_sys01_off.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_off.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_on.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '80'");
+						
+					} else {
+						hd_image1.setSrc( "/images/logo_nibs.png");
+					
+						hd_image2.setSrc( "/images/btn_sys01_on.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_off.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_off.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '10'");
+					}
+
+					//최근 history 삭제;
+					gen_history.removeAll();
+
+					//메뉴 hidden 처리;
+					group14.setStyle("display", "none");
+
+					if ( sysType == "0" ) { 
+						anchor1.setValue("운영시스템");
+					} else if ( sysType == "1" ) { 
+						anchor1.setValue("정보시스템");
+					} else if ( sysType == "2" ) { 
+						anchor1.setValue("관리시스템");
+					}
+
+					fncQuery(sysType);			//메뉴 목록 Select (전체메뉴)
+					
+	            } catch (e) {
+					alert("fncChangeSysType(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+			scwin.fncChangeSystem = function (info) {
+				var sysType = info.newValue;
+
+				// 이전 시스템의 windowContainer nameLayer 삭제;
+				win_main_closeAll.click();
+
+				if ( sysType == "0" ){
+						hd_image1.setSrc( "/images/logo_nibs.png");
+					
+						hd_image2.setSrc( "/images/btn_sys01_on.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_off.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_off.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '10'");
+						
+					} else if ( sysType == "1" ){
+						hd_image1.setSrc( "/images/logo_h1_02.gif");
+						
+						hd_image2.setSrc( "/images/btn_sys01_off.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_on.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_off.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '35'");
+						
+					} else if ( sysType == "2" ){
+						hd_image1.setSrc( "/images/logo_h1_03.gif");
+					
+						hd_image2.setSrc( "/images/btn_sys01_off.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_off.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_on.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '80'");
+						
+					} else {
+						hd_image1.setSrc( "/images/logo_nibs.png");
+					
+						hd_image2.setSrc( "/images/btn_sys01_on.gif" );
+						hd_image3.setSrc( "/images/btn_sys02_off.gif" );
+						hd_image4.setSrc( "/images/btn_sys03_off.gif" );
+
+						$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '10'");
+					}
+
+					//최근 history 삭제;
+					gen_history.removeAll();
+
+					group14.setStyle("display", "none");
+
+					fncQuery(sysType);			//메뉴 목록 Select (전체메뉴)
+			}
+	        
+	        /**
+				함수명: fncCloseMenu
+				설  명: 업무 프로그램을 닫는다.(현재 선택된 윈도우컨테이너)
+				인  자: 
+				리  턴: 
+			 */
+	        function fncCloseMenu(){
+	        	try {	        	
+					//현재 선택된 윈도우컨테이너를 닫는다	                	       
+					win_main.closeWindow();
+	        	} catch (e) {
+					alert("fncCloseMenu(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+	        /**
+				함수명: fncLogout
+				설  명: 로그아웃 처리
+				인  자: 
+				리  턴: 
+			 */
+	        function fncLogout() {
+	        	try {
+	        		if(confirm(cm_getMessage("W0008", "로그아웃"))){					//로그아웃 하시겠습니까?
+	        	
+						//CTI 관련 로그아웃 처리 
+						cm_ctiLogout();
+	        	
+						var requestData = {};		
+						var action		= "logout";
+						var callBack	= fncLogout_RESULT;
+						cm_submitAjax(gv_systemPath, action, requestData, callBack);	//서버 ajax 통신
+					}	
+	        	} catch (e) {
+					alert("fncLogout(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+	        }
+
+	        function fncLogout_RESULT(resultData){
+	            try {
+		        	//cm_logPrint("resultdata=>"+JSON.stringify(resultData));	//결과로그 출력 
+	        		
+	        		cm_moveW2xPath("mn/sys/common/login.do", top.frames["frmMain"]);
+	            } catch (e) {
+					alert("fncLogout_RESULT(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+	        }
+
+	        /**
+				함수명: fncPopPasswordChange
+				설  명: 비밀번호 변경 팝업
+				인  자: 
+				리  턴: 
+			 */
+			function fncPopPasswordChange(){
+	            try {
+	            	var callBack	= "fncPopPasswordChange_RESULT";
+					var doc 			= cm_makeXmlDocForPopup({
+	    					/* AAA		: 	123,		// 코드1 */
+	    					/* BBB		: 	456, 		// 코드2 */
+	    					CALLBACK	: callBack 	// 결과 받을 함수명 
+	   				});
+	            	cm_passwordChangePopup(doc);	//비밀번호변경 팝업	  
+	            } catch (e) {
+					alert("fncPopPasswordChange(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+			function fncPopPasswordChange_RESULT(){
+	            try {
+					//비밀번호 변경 이후 처리할 로직 
+					
+	            } catch (e) {
+					alert("fncPopPasswordChange(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+	        /**
+				함수명: fncQuickQuery
+				설  명: 퀵메뉴(출퇴근) 관련 정보 조회
+				인  자: 
+				리  턴: 
+			 */
+	        function fncQuickQuery() {
+	        	try {
+					var requestData = {};
+
+					var action		= "selectQuickViewInfo";
+					var callBack	= fncQuickQuery_RESULT;
+					cm_submitAjax(gv_systemPath, action, requestData, callBack);	//서버 ajax 통신					
+	        	} catch (e) {
+					alert("fncQuickQuery(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+	        }
+
+	        function fncQuickQuery_RESULT(resultData){
+	            try {
+	            	//cm_logPrint("resultdata=>"+JSON.stringify(resultData));	//결과로그 출력	            	
+	            	var result = resultData.resultInfo;
+            		var startTime	= cm_safeString(result.startTime);
+            		var sTime		= cm_safeString(result.sTime);
+            		var fTime		= cm_safeString(result.fTime);
+				
+					//퀵메뉴 View 설정 (출퇴근)
+					if ( SS_deptCode == "20" && SS_officeCode == "10" ){
+						//출퇴근용
+						if ( startTime != "" && sTime == "" && fTime == "" ){
+							gv_showGB = "Y";
+							grp_quick_10.show( "" );
+							grp_quick_11.show( "" );
+						}
+						//출근만
+						if ( startTime != "" && sTime == "" && fTime != "" ){
+							grp_quick_10.show( "" );
+							grp_quick_11.hide();						
+						}
+						//퇴근만
+						if ( startTime != "" && sTime != "" && fTime == "" ){
+							grp_quick_10.hide();
+							grp_quick_11.show( "" );
+						}
+						//출퇴근완료후
+						if ( startTime == "" && sTime != "" && fTime != "" ){
+							grp_quick_10.hide();
+							grp_quick_11.hide();
+						}	
+					} else {
+						grp_quick_10.hide();
+						grp_quick_11.hide();
+					}			
+	            } catch (e) {
+					alert("fncQuickQuery_RESULT(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+	        }
+
+	        /**
+				함수명: fncQuick
+				설  명: 퀵메뉴 ==> 화면 분기만 할 수 있도록 작업 (CTI 관련은 ????????, 디자인은?????????)
+				인  자: shortKey (퀵메뉴 구분값)
+				리  턴: 
+			 */
+			function fncQuick(shortKey){
+	            try {
+	            
+	            	if ( SS_deptCode == "20" && SS_officeCode == "10" ){
+	            	
+						if(shortKey=="1"){ //cti 로그인
+							//forward('GIS' ,'위치관제','/ntms/gis/pos/LocationHistoryMap.jsp','위치기록지도', '0110000100','20','15','3','CT-1044');
+							//fncClickMenu( "/op/gis/locationhistorymap.do" ,"위치기록지도", "20153" );		//해당 화면 프로그램에 등록되어있지 않음	
+							callCtmpMethod("Relogin","");
+
+						} else if (shortKey=="2"){ //실시간모니터링(팝업)
+							//forwardPopup('장애' ,'모니터링','/ntms/error/monitor/CurrentMonitor.jsp?mMainSeq=&sMainSeq=$newRealMonitoring$width=1265,height=980,left=0,top=0, toolbar=no,directories=no,status=no,scrollbars=auto,resizable=yes,menubar=no','실시간 모니터링', '0110000100','15','15','8','CT-1018');
+							fncClickMenuPop( "/op/trouble/realTrbl.do" ,"실시간 모니터링", "15158" );
+							
+						} else if (shortKey=="3"){ //SMS전송하기(일반)
+							//forward('장애' ,'콜센터','/ntms/error/call/SmsSend.jsp','SMS 전송', '0110000100','15','20','12','CT-1032');
+							fncClickMenu( "/op/trouble/smssend.do" ,"SMS 전송 및 PDA공지", "152012" );
+							
+						} else if (shortKey=="4"){ //장애접수(팝업)
+							//forwardPopup('장애' ,'장애관리','/ntms/error/errormng/ErrerReceive.jsp?mMainSeq=&sMainSeq=$popErrPage$width=1265 ,height=880,left=0,top=0, toolbar=no,directories=no,status=no,scrollbars=auto,resizable=yes,menubar=no','장애접수', '1111111111','15','10','2','CT-1002');
+							//fncClickMenuPop( "/op/trouble/retrieve.do" ,"장애접수", "15102" );
+							window.open("/nibs.jsp?w2xPath=/op/trouble/retrieve.do","TRBL_REG" + window.parent.top.frames['frmMain'].cm_getCurrentDate("yyyyMMddHHmmssSS") , "width=1250, height=860, top=0,left=0, resizable=yes");
+							
+						} else if (shortKey=="5"){ //AS접수(일반)
+							//forward('장애' ,'장애관리','/ntms/error/errormng/AsReceive.jsp','AS접수', '1111111111','15','10','3','CT-1003');
+							fncClickMenu( "/op/trouble/asReg.do" ,"AS접수", "15103" );
+							
+						} else if (shortKey=="6"){ //장애조회(팝업)
+							//forwardPopup('장애' ,'장애관리','/ntms/error/errormng/ErrerS.jsp?mMainSeq=&sMainSeq=$popErrListPage$width=1260 ,height=950,left=0,top=0, toolbar=no,directories=no,status=yes,scrollbars=auto,resizable=yes,menubar=no','장애조회', '1111111111','15','10','7','CT-1007');
+							fncClickMenuPop( "/op/trouble/rtoubleRevt.do" ,"장애조회", "15107" );
+							
+						} else if (shortKey=="7"){ //전화걸기(팝업)
+							//forwardPopup('장애' ,'콜센터','/ntms/error/call/TelOn.jsp?mMainSeq=&sMainSeq=$callPop$width=890 ,height=730,left=0,top=0, toolbar=no,directories=no,status=no,scrollbars=auto,resizable=yes,menubar=no','전화 걸기', '0110000100','15','20','10','CT-1030');
+							fncClickMenuPop( "/op/trouble/telon.do" ,"전화 걸기", "152010" );
+							
+						} else if (shortKey=="10"){ //전화끊기 => escCTI.jsp 에서 Cti.js 
+							callCtmpMethod("DropConfCall","");
+							
+						} else if (shortKey=="11"){ //CTI통계 ==> 해당화면 ???
+							//var status ="toolbar=no,location=no,directories=no,status=no,menubar=no,resizable=no,scrollbars=no,width=480,height=106,left=0,top=0"
+							//window.open('/ntms/error/monitor/CtiStaticInfo.jsp', 'ctiStatic', status);	
+							alert("CTI통계 화면");
+							
+						} else if (shortKey=="8"){ //출근
+							fncSetWorkTime("0");
+							
+						} else if (shortKey=="9"){ //퇴근
+							fncSetWorkTime("1");
+							
+						}	            	
+					}
+					
+	            } catch (e) {
+					alert("fncQuick(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+			
+	        /**
+				함수명: fncSetWorkTime
+				설  명: 출/퇴근 정보 Update 
+				인  자: gubun (출근:0, 퇴근:1)
+				리  턴: 
+			 */
+			function fncSetWorkTime(gubun){
+	            try {
+					if(gubun == '0'){
+						gv_showGB = "";
+					}
+					if(gubun == '1' && gv_showGB == 'Y'){
+						alert(cm_getMessage("SYS.E0002"));		//출근처리 후 퇴근 처리 가능합니다.
+						return;
+					}
+					
+					var action		= "updateStartWorkTime";		//출근처리
+					if(gubun == '1'){
+						action		= "updateFinishWorkTime";		//퇴근처리
+					}
+					var requestData = {};
+					var callBack	= fncSetWorkTime_RESULT;
+					cm_submitAjax(gv_systemPath, action, requestData, callBack);	//서버 ajax 통신
+											
+	            } catch (e) {
+					alert("fncSetWorkTime(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+			function fncSetWorkTime_RESULT(resultData){
+	            try {
+	            	//cm_logPrint("resultdata=>\n"+JSON.stringify(resultData));	//결과로그 출력	            	
+	            	var gubun = resultData.gubun;
+	            	if ( gubun == "0" ){
+	            		alert(cm_getMessage("I0031","출근"));		//{0} 처리 되었습니다.
+	            		//출근hide, 퇴근show
+	            		grp_quick_10.hide();
+	            		grp_quick_11.show( "" );
+	            		
+	            	} else if ( gubun == "1" ){	            		
+	            		alert(cm_getMessage("I0031","퇴근"));		//{0} 처리 되었습니다.
+	            		//출근hide, 퇴근hide
+	            		grp_quick_10.hide();
+	            		grp_quick_11.hide();	    
+	            	}
+	            } catch (e) {
+					alert("fncSetWorkTime_RESULT(): " + e.message);
+					WebSquare.exception.printStackTrace(e);
+				}				
+			}
+
+	        //=============================================================================
+	        // 5. AS-IS 함수 (확인 필요)
+	        //=============================================================================
+			function OnChangeAgent(ActCd){ //전화기에서 Ready / Not Ready변경시 App에 반영
+				/*
+				var form = document.all;
+				if(ActCd=="2"){
+					form.readGubun.value = "1"; //ready
+				} else {
+					form.readGubun.value = "2"; //not ready
+				}
+				js_Status();
+				*/
+				
+				if(ActCd=="2"){
+					readGubun.setValue( "1" );		//ready
+				} else {
+					readGubun.setValue( "2" );		//not ready
+				}
+				js_Status();
+			}
+			
+			function callDrop(){			
+			}
+			
+			function calling(){ //통화중
+			}
+			
+			function jf_updateStatus(status){
+				//memberStatus.jsp 관련 소스 내용 무 
+				/*
+				var form = document.form;
+				form.status.value   = status;
+				form.memberId.value ="${user.userId}";
+			
+				form.target = "hiddenFrame1";
+				form.action = "/ntms/error/call/memberStatus.jsp";
+				form.submit();
+				*/
+			}
+			
+			function js_Status(){
+				/*
+				var form = document.all;
+				if(form.readGubun.value == '1'){ //ready
+					Ready();
+					readG.style.display = "";
+					readY.style.display  = "";
+					readN.style.display = "none";
+				}else{
+					NotReady();
+					readG.style.display = "";
+					readY.style.display = "none";
+					readN.style.display = "";
+				}
+				*/
+				
+				if(readGubun.getValue() == '1'){ 	//ready
+				
+					var requestData = {};
+					var callBack  = fncCtiStatus_RESULT;
+					cm_submitAjax("", "isSession", requestData, callBack);  //서버 ajax 통신
+				    
+					//Ready();
+					//readGubun.show( "" );
+					//readY.show( "" );
+					//readN.hide();
+				}else{
+				  //대체
+					//NotReady();
+					NotReady(readN.getValue());
+					readGubun.show( "" );
+					readY.hide();
+					readN.show( "" );
+				}
+			}
+
+			function fncCtiStatus_RESULT(resultData){
+			     if( resultData.isSession == true ){
+                    Ready();
+                    readGubun.show( "" );
+                    readY.show( "" );
+                    readN.hide();
+                 }
+                 else
+                 {
+                    cm_ctiLogout();
+                    top.location.href = "/"; 
+                 }
+			}
+			
+			function js_Status2(){
+				/*
+				var form = document.all;
+				SetActivityCode(form.readStatusN.value);
+				jf_updateStatus(form.readStatusN.value);
+				*/
+				
+				SetActivityCode(readN.getValue());
+				jf_updateStatus(readN.getValue());
+			}
+			
+			function js_SetMsg(status){
+			 cm_msg(status);
+			}
+			
+			function topWin(){
+			 //popup = window.open("","","height=175,width=300,top=100,left=100,scrollbars=no");
+			 //var popup = window.open("/nibs.jsp?w2xPath=/op/trouble/retrieve.do","TRBL_REG" + window.parent.top.frames['frmMain'].cm_getCurrentDate("yyyyMMddHHmmssSS") , "width=500, height=80, top=0,left=0, scrollbars=no");
+			 //popup.focus();
+			 
+			 fncClickMenuPop( "/op/trouble/telon.do" ,"전화 걸기", "152010" );
+			 
+			}
+
+			/**
+				함수명: fncPopCtiStatus
+				설  명: 상담원 상태 표시 팝업
+				인  자: 
+				리  턴: 
+			*/
+			function fncPopCtiStatus(){
+			//"toolbar=no,location=no,directories=no,status=no,menubar=no,resizable=no,scrollbars=no,width=480,height=106,left=0,top=0"
+				try {
+					var callBack  = "fncPopCtiStatus_RESULT";
+					var doc       = cm_makeXmlDocForPopup({
+					/* AAA    :   123,    // 코드1 */
+					/* BBB    :   456,    // 코드2 */
+					CALLBACK  : callBack  // 결과 받을 함수명 
+					});
+					cm_ctiStatusPopup(doc);  //비밀번호변경 팝업   
+				} catch (e) {
+				alert("fncPopCtiStatus(): " + e.message);
+				WebSquare.exception.printStackTrace(e);
+				}
+			}
+      
+			function fncPopCtiStatus_RESULT(){
+				try {
+			
+				} catch (e) {
+				alert("fncPopCtiStatus_RESULT(): " + e.message);
+				WebSquare.exception.printStackTrace(e);
+				}
+			}
+      
+			/**
+				함수명: fncSaveCtiStatus
+				설  명: 상담원 상태 저장
+				인  자: 
+				리  턴: 
+			*/
+			function fncSaveCtiStatus(TerminalName, AgentState, UserID, ReasonCode, LoginID){
+				try {
+				//gv_sysType = sysType;     //현재 선택 시스템구분 셋팅              
+					
+				var action    = "saveCtiStatus";    //cti 상태 저장
+				
+				var requestData = {};
+				requestData.memberId = SS_userId;       //아이디
+				requestData.status = AgentState;        //cti 상태
+				requestData.inTelNo = TerminalName;     //내선번호
+				requestData.ctiId = UserID;             //cti id
+				requestData.reasonCd = ReasonCode;      //원인코드
+				
+				var callBack  = fncSaveCtiStatus_RESULT;
+				cm_submitAjax(gv_systemPath, action, requestData, callBack);  //서버 ajax 통신
+				
+				} catch (e) {
+				alert("fncSaveCtiStatus(): " + e.message);
+				WebSquare.exception.printStackTrace(e);
+				}
+			}
+
+			function fncSaveCtiStatus_RESULT(resultData){
+				try {
+					
+				} catch (e) {
+				alert("fncSaveCtiStatus_RESULT(): " + e.message);
+				WebSquare.exception.printStackTrace(e);
+				}       
+			} 
+
+			//=============================================================================
+			// 6. 페이지 fncOnLoad 함수 호출
+			//=============================================================================
+			fncOnLoad();
+
+
+			
+			scwin.btn_menu1_Label_onclick = function () {
+				//dlt_menu 갱신 처리;
+				fncQuery(gv_sysType);
+
+				var pageCode = this.getUserData("ins_code");
+				$p.main().se_wframe.getWindow().trv_menu.setCondition("filter","gMenuId == '" + pageCode + "'");
+
+				fncInitMenu();
+				
+				var i;
+				var cmpChild;
+				var numIndex;
+				var cmpLabel;
+				var genLen = gen_firstGenerator.getLength();
+
+				numIndex = this.getGeneratedIndex();
+
+				for ( i=0; i < genLen; i++ ) {
+					cmpChild = gen_firstGenerator.getChild(i, "checked1DepthMenu");
+					cmpLabel = gen_firstGenerator.getChild(i, "btn_menu1_Label");
+
+					if ( numIndex == i ) {
+						cmpChild.addClass("on");
+						menuTitle.setValue(cmpLabel.getValue());
+					} else {
+						cmpChild.removeClass("on");
+					}
+				}
+			};
+
+			scwin.setMenuToggle = function() {
+				if ( se_wframe.getStyle("width") > "100px" ) {
+					$("#se_wframe").css("width", "0px");
+					CONTAINER.setStyle("left", "-220px");
+					$("#CONTAINER").css("transition", "all .5s linear");
+				} else {
+					$("#se_wframe").css("width", "220px");
+					CONTAINER.setStyle("left", "0px");
+					$("#CONTAINER").css("transition", "all .5s linear");
+				}
+			};
+
+			scwin.showEachSystem = function() {
+				if ( group14.getStyle("display" ) == "block" ) {
+					group14.setStyle("display", "none");
+				} else {
+					group14.setStyle("display", "block");
+				}
+			};
+
+			scwin.fncShowMyInfo = function() {
+				if ( group11.getStyle("display") ==  "block" ) {
+					group11.setStyle("display", "none");
+				} else {
+					group11.setStyle("display", "block");
+				}
+			};
+
+			scwin.fnclogout = function() {
+				fncLogout();
+				group11.setStyle("display", "none");
+			};
+
+			scwin.fncChangePassword = function() {
+				fncPopPasswordChange();
+				group11.setStyle("display", "none");
+			};]]></script>
+    </head>
+    <body>
+    	<xf:group class="" id="HEADER" style="">
+    		<xf:group id="hd_groupp1" style="" class="header_wrap">
+    			<!-- 퀵메뉴 영역 START : 퍼블리싱 & 이미지 필요함(일단은 AS-IS 형태 그대로 붙여넣기함(2014.09.16) -->
+    			<xf:group id="" class="logo_wrap"><xf:group tagname="h1" style="" id="hd_groupp2">
+    				<xf:group tagname="a" style="" id="hd_groupp3" class="">
+    					<xf:image src="/images/logo_nibs.png" ev:onclick="scwin.hd_image1_onclick" alt="NIBS+ 운영시스템" style=""
+    						id="hd_image1">
+    					</xf:image>
+    					<w2:textbox id="sys_name" label="운영시스템" style="" class="sys_name" tagname="span"></w2:textbox>
+    					<script ev:event="onclick" type="javascript"><![CDATA[
+								location.reload(); 
+							 ]]></script>
+    				</xf:group>
+				</xf:group>
+    			<xf:group tagname="a" style="" id="group18" class="">
+    				<w2:anchor outerDiv="false" style="" id="btn_toggle_menu" class="btn_toggle_menu" ev:onclick="scwin.setMenuToggle">
+    					<xf:label><![CDATA[slide]]></xf:label>
+    				</w2:anchor>
+				</xf:group>
+			</xf:group>
+			<w2:generator style="" id="gen_firstGenerator" class="gnb_menu" tagname="ul">
+    			<xf:group style="" id="checked1DepthMenu" class="" tagname="li">
+    				<xf:group id="" tagname="h2">
+    					<w2:anchor outerDiv="false" ev:onclick="scwin.btn_menu1_Label_onclick" style="" id="btn_menu1_Label">
+    						<xf:label><![CDATA[1depth 메뉴]]></xf:label>
+    					</w2:anchor>
+    				</xf:group>
+    			</xf:group>
+    		</w2:generator>
+    		<xf:group id="hd_quick"
+    				style="display:none;  left:260px; margin-top:-15px; background: url(/images/header/q_icon_bg.gif) repeat-x center top;"
+    				class="sys_wrap" tagname="ul">
+
+    				<xf:image id="img_quick_bg" style="" alt="" src="/images/header/q_icon_bg01.gif"></xf:image>
+
+    				<xf:group id="grp_quick_0" style="" tagname="a" class="">
+    					<xf:image id="img_quick_0" style="" alt="" src="/images/header/q_icon_qmenu.gif" tagname="a"></xf:image>
+    				</xf:group>
+
+    				<!-- CTI통계 퀵 링크 ==> 현재 개발된 화면 존재하지 않음 (한대표님 확인함) : 일단은 주석처리함-->
+    				<!--
+    					<xf:group id="grp_quick_1" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_1" style="cursor:pointer;" title="CTI통계" src="/images/header/q_icon_ctimonitor.gif" tagname="a">
+    					<script ev:event="onclick" type="javascript"><![CDATA[
+    					fncQuick("11");
+    					]]></script> 					
+    					</xf:image>
+    					</xf:group>
+    				-->
+    				<!--  위치기록지도 사용안함 : cti 로그인으로 변경 -->
+
+    				<xf:group id="grp_quick_2" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_2" style="cursor:pointer;" title="cti로그인" src="/images/header/q_icon_location.gif"
+    						tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("1");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_3" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_3" style="cursor:pointer;" title="실시간모니터링" src="/images/header/q_icon_monitor.gif"
+    						tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("2");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_4" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_4" style="cursor:pointer;" title="SMS전송하기" src="/images/header/q_icon_sms.gif"
+    						tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("3");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_5" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_5" style="cursor:pointer;" title="장애접수" src="/images/header/q_icon_application.gif"
+    						tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("4");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_6" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_6" style="cursor:pointer;" title="AS접수" src="/images/header/q_icon_as.gif" tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("5");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_7" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_7" style="cursor:pointer;" title="장애조회" src="/images/header/q_icon_barrier.gif"
+    						tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("6");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_8" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_8" style="cursor:pointer;" title="전화걸기" src="/images/header/q_icon_call.gif" tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("7");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_9" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_9" style="cursor:pointer;" title="전화끊기" src="/images/header/q_icon_calloff.gif"
+    						tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("10");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+    				<xf:group id="grp_quick_10" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_10" style="cursor:pointer;" title="출근" src="/images/header/qmenu_08_on.gif" tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("8");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+
+    				<xf:group id="grp_quick_11" style="margin-left:8px;" tagname="a" class="">
+    					<xf:image id="img_quick_11" style="cursor:pointer;" title="퇴근" src="/images/header/qmenu_09_on.gif" tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncQuick("9");
+							 ]]></script>
+    					</xf:image>
+    				</xf:group>
+
+    				<xf:image id="img_quick_bg2" style="" alt="" src="/images/header/q_icon_bg.gif"></xf:image>
+    				<xf:image id="img_quick_bg3" style="" alt="" src="/images/header/q_icon_bg.gif"></xf:image>
+    				<xf:image id="img_quick_bg4" style="" alt="" src="/images/header/q_icon_bg.gif"></xf:image>
+
+    				<!-- 셀렉트박스 START -->
+    				<xf:group id="hd_select" style="left: 0px; margin-top: 7px;" class="" tagname="">
+    					<xf:select1 allOption="" appearance="minimal" chooseOption="" chooseOptionLabel="" direction="auto" disabled="false"
+    						disabledClass="w2selectbox_disabled" displayMode="" id="readGubun" style="width:80px;" submenuSize="auto" delimiter=" ">
+    						<xf:choices>
+    							<xf:item>
+    								<xf:label><![CDATA[Not Ready]]></xf:label>
+    								<xf:value><![CDATA[2]]></xf:value>
+    							</xf:item>
+    							<xf:item>
+    								<xf:label><![CDATA[Ready]]></xf:label>
+    								<xf:value><![CDATA[1]]></xf:value>
+    							</xf:item>
+    						</xf:choices>
+    						<script ev:event="onchange" type="javascript"><![CDATA[
+								js_Status();
+							 ]]></script>
+    					</xf:select1>
+
+    					<xf:select1 allOption="" appearance="minimal" chooseOption="" chooseOptionLabel="" direction="auto" disabled="false"
+    						disabledClass="w2selectbox_disabled" displayMode="" id="readN" style="width:80px;margin-left:5px;" submenuSize="auto"
+    						delimiter=" ">
+    						<script ev:event="onchange" type="javascript"><![CDATA[
+								js_Status2();
+							 ]]></script>
+    					</xf:select1>
+
+    					<xf:select1 allOption="" appearance="minimal" chooseOption="" chooseOptionLabel="" direction="auto" disabled="false"
+    						disabledClass="w2selectbox_disabled" displayMode="" id="readY" style="width:80px;margin-left:5px;display:none;" submenuSize="auto"
+    						delimiter=" ">
+    						<xf:choices>
+    							<xf:item>
+    								<xf:label><![CDATA[READY]]></xf:label>
+    								<xf:value><![CDATA[1000]]></xf:value>
+    							</xf:item>
+    						</xf:choices>
+    						<script ev:event="onchange" type="javascript"><![CDATA[
+								js_Status2();
+							 ]]></script>
+    					</xf:select1>
+    				</xf:group>
+    				<!-- 셀렉트박스 END -->
+    			</xf:group>
+    			<!-- 퀵메뉴 영역 END : 퍼블리싱 & 이미지 필요함(일단은 AS-IS 형태 그대로 붙여넣기함(2014.09.16) -->
+
+    			<!-- cti 상태 표시 start -->
+    			<xf:group id="hd_groupp8" style="margin-top:-16px;" class="sys_wrap" tagname="ul">
+    				<xf:group id="" style="" tagname="li">
+    					<w2:textbox id="hd_groupp18" label="CTI" style="" tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+    						callCtmpMethod("Test","01020274172");
+    						 ]]></script>
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="group7" style="" tagname="li">
+    					<w2:textbox id="cti_text" label="" style="" tagname="a"></w2:textbox>
+    				</xf:group>
+    			</xf:group>
+    			<!-- cti 상태 표시 end -->
+    			<!-- xf:group id="hd_groupp4" style="" class="sys_wrap" tagname="ul">
+    				<xf:group id="hd_groupp6" style="" tagname="li">
+    					<w2:textbox id="hd_textboxt1" style="" label="HOME" tagname="a">
+    						<w2:attributes>
+    							<w2:href>#</w2:href>
+    						</w2:attributes>
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								location.reload(); 
+							 ]]></script>
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="hd_groupp7" style="" tagname="li" class="user_txt">
+    					<w2:textbox id="hd_textboxt2" label="" style="" tagname="a">
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+               fncPopCtiStatus();
+               ]]></script>
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="hd_groupp13" style="" tagname="li">
+    					<w2:textbox id="hd_textboxt5" label="비밀번호변경" style="" tagname="a">
+    						<w2:attributes>
+    							<w2:href>#</w2:href>
+    						</w2:attributes>
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+								fncPopPasswordChange();
+    						 ]]></script>
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="hd_groupp14" style="" tagname="li">
+    					<w2:textbox id="hd_textboxt6" label="로그아웃" style="" tagname="a">
+    						<w2:attributes>
+    							<w2:href>#</w2:href>
+    						</w2:attributes>
+    						<script ev:event="onclick" type="javascript"><![CDATA[
+    							fncLogout();
+    						 ]]></script>
+    					</w2:textbox>
+    				</xf:group>
+    			</xf:group-->
+    			<xf:group id="hd_group15" style="display: none" class="util_wrap">
+    				<xf:group id="hd_group16" style="display:none;" tagname="a">
+    					<w2:attributes>
+    						<w2:href>#</w2:href>
+    					</w2:attributes>
+    					<xf:image id="hd_image2" src="/images/btn_sys01_on.gif" alt="운영시스템"></xf:image>
+    					<script ev:event="onclick" type="javascript"><![CDATA[
+	            			if ( gv_sysType != "0" ){
+	            				fncChangeSysType("0");
+	            			}
+    					 ]]></script>
+    				</xf:group>
+    				<xf:group id="hd_group17" style="display:none;" tagname="a">
+    					<w2:attributes>
+    						<w2:href>#</w2:href>
+    					</w2:attributes>
+    					<xf:image id="hd_image3" src="/images/btn_sys02_off.gif" alt="정보시스템"></xf:image>
+    					<script ev:event="onclick" type="javascript"><![CDATA[
+	            			if ( gv_sysType != "1" ){
+	            				fncChangeSysType("1");
+	            			}				  			
+    					 ]]></script>
+    				</xf:group>
+    				<xf:group id="hd_group18" style="display:none;" tagname="a">
+    					<w2:attributes>
+    						<w2:href>#</w2:href>
+    					</w2:attributes>
+    					<xf:image id="hd_image4" src="/images/btn_sys03_off.gif" alt="관리시스템"></xf:image>
+    					<script ev:event="onclick" type="javascript"><![CDATA[
+	            			if ( gv_sysType != "2" ){
+	            				fncChangeSysType("2");
+	            			}				  			
+    					 ]]></script>
+    				</xf:group>
+    			</xf:group>
+    			<!-- 0220 삭제 대상 -->
+
+
+    			<xf:group id="" class="user_info">
+    				<xf:group id="group10" class="name">
+    					<xf:image src="/images/main_user_info.png" alt="사용자 아이콘" style="" id="image2" title="사용자 아이콘" class="user_icon"></xf:image>
+    					<xf:group style="" id="group9" class="user_name">
+    						<w2:anchor outerDiv="false" style="" id="btn_arrow" class="btn_arrow" ev:onclick="scwin.fncShowMyInfo">
+    							<xf:label><![CDATA[홍길동]]></xf:label>
+    						</w2:anchor>
+    					</xf:group>
+    				</xf:group>
+    				<!-- xf:group id="group8" class="">
+    					<xf:select1 id="systemType" chooseOption="" class="system" submenuSize="auto" allOption="" disabled="false"
+				    		direction="auto" appearance="minimal" disabledClass="w2selectbox_disabled" ref="">
+				    		<xf:choices>
+				    			<xf:item>
+				    				<xf:label><![CDATA[운영시스템]]></xf:label>
+				    				<xf:value><![CDATA[0]]></xf:value>
+				    			</xf:item>
+				    			<xf:item>
+				    				<xf:label><![CDATA[정보시스템]]></xf:label>
+				    				<xf:value><![CDATA[1]]></xf:value>
+				    			</xf:item>
+				    			<xf:item>
+				    				<xf:label><![CDATA[관리시스템]]></xf:label>
+				    				<xf:value><![CDATA[2]]></xf:value>
+				    			</xf:item>
+				    		</xf:choices>
+				    	</xf:select1>
+				    </xf:group -->
+    				<xf:group id="group8" class="system">
+    					<w2:anchor outerDiv="false" style="" id="anchor1" class="btn_arrow" ev:onclick="scwin.showEachSystem">
+    						<xf:label><![CDATA[운영시스템]]></xf:label>
+    					</w2:anchor>
+    				</xf:group>
+    			</xf:group>
+    			
+    		</xf:group>
+    		<!-- //0220 삭제 대상 -->
+
+    		<!-- 메뉴 START!! -->
+
+
+
+    		<!-- 메뉴 END! -->
+
+    	</xf:group>
+    	<!-- 이름 클릭시 정보 노출 -->
+    	<xf:group id="group11" tagname="ul" class="user_select" style="display:none">
+    		<xf:group id="group12" tagname="li">
+    			<w2:anchor outerDiv="false" style="" id="anchor12" ev:onclick="scwin.fncChangePassword">
+    				<xf:label><![CDATA[비밀번호변경]]></xf:label>
+    			</w2:anchor>
+    		</xf:group>
+    		<xf:group id="group13" tagname="li" style="">
+    			<w2:anchor id="anchor13" outerDiv="false" style="width: 100px;height: 23px;" ev:onclick="scwin.fnclogout">
+    				<xf:label><![CDATA[Logout]]></xf:label>
+    			</w2:anchor>
+    		</xf:group>
+    	</xf:group>
+    	<!-- //이름 클릭시 정보 노출 -->
+
+    	<xf:group class="user_select system" id="group14" tagname="ul" style="display:none">
+    		<xf:group id="group15" tagname="li">
+    			<w2:anchor id="anchor15" outerDiv="false" style="" ev:onclick="fncChangeSysType('0')">
+    				<xf:label><![CDATA[운영시스템]]></xf:label>
+    			</w2:anchor>
+    		</xf:group>
+    		<xf:group id="group16" style="" tagname="li">
+    			<w2:anchor id="anchor16" outerDiv="false" style="width: 100px;height: 23px;"  ev:onclick="fncChangeSysType('1')">
+    				<xf:label><![CDATA[정보시스템]]></xf:label>
+    			</w2:anchor>
+    		</xf:group>
+    		<xf:group id="group17" style="" tagname="li">
+    			<w2:anchor id="anchor17" outerDiv="false" style="width: 100px;height: 23px;"  ev:onclick="fncChangeSysType('2')">
+    				<xf:label><![CDATA[관리시스템]]></xf:label>
+    			</w2:anchor>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>
